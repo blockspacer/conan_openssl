@@ -65,6 +65,8 @@ class OpenSSLConan(ConanFile):
     settings = "os_build", "os", "compiler", "arch", "build_type"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://github.com/openssl/openssl"
+    #repo_url = 'git@github.com:openssl/openssl.git'
+    #repo_url = 'http://github.com/openssl/openssl.git'
     repo_url = 'https://github.com/openssl/openssl.git'
     #generators = "cmake", "cmake_paths", "virtualenv"
     license = "OpenSSL"
@@ -143,7 +145,9 @@ class OpenSSLConan(ConanFile):
         #    tools.get(url, sha256=self.conan_data["sources"][self.version]["sha256"])
         #extracted_folder = "openssl-" + self.version
         #os.rename(extracted_folder, self._source_subfolder)
-        self.run('git clone --progress --depth 1 --branch {} --recursive --recurse-submodules {} {}'.format(self.version, self.repo_url, self._source_subfolder))
+        #self.run('GIT_TRACE_PACKET=1 GIT_TRACE=1 GIT_CURL_VERBOSE=1 GIT_SSL_NO_VERIFY=true git clone --ipv4 --progress --depth 1 --branch {} --single-branch --recursive --recurse-submodules --shallow-submodules {} {}'.format(self.version, self.repo_url, self._source_subfolder))
+        self.run('git clone --progress --branch {} --recursive --recurse-submodules {} {}'.format(self.version, self.repo_url, self._source_subfolder))
+
 
     def configure(self):
         del self.settings.compiler.libcxx
@@ -620,6 +624,6 @@ class OpenSSLConan(ConanFile):
             self.cpp_info.libs.extend(["dl", "pthread"])
 
     # see `conan install . -g deploy` in https://docs.conan.io/en/latest/devtools/running_packages.html
-    def deploy(self):
+    #def deploy(self):
         # self.copy("*", dst="/usr/local/bin", src="bin", keep_path=False)
-        self.copy("*", dst="bin", src="bin", keep_path=False)
+    #    self.copy("*", dst="bin", src="bin", keep_path=False)
