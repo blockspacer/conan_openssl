@@ -99,6 +99,7 @@ class OpenSSLConan(ConanFile):
                "openssldir": "ANY"}
     default_options = {key: False for key in options.keys()}
     default_options["fPIC"] = True
+    default_options["shared"] = True
     default_options["openssldir"] = None
     _env_build = None
     _source_subfolder = "sources"
