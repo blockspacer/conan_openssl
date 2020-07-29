@@ -99,6 +99,7 @@ class OpenSSLConan(ConanFile):
                "openssldir": "ANY"}
     default_options = {key: False for key in options.keys()}
     default_options["fPIC"] = True
+    default_options["no_zlib"] = True
     default_options["shared"] = True
     default_options["openssldir"] = None
     _env_build = None
@@ -162,6 +163,7 @@ class OpenSSLConan(ConanFile):
 
     def requirements(self):
         if not self.options.no_zlib:
+            # TODO: use self.requires("chromium_zlib/master@conan/stable")
             self.requires("zlib/v1.2.11@conan/stable")
 
     @property
