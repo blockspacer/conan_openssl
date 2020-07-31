@@ -6,6 +6,22 @@ from conans.errors import ConanInvalidConfiguration, ConanException
 from conans import ConanFile, AutoToolsBuildEnvironment, tools
 from conans.tools import os_info
 
+import glob
+import os
+from conans import ConanFile, CMake, tools
+from conans.model.version import Version
+from conans.errors import ConanInvalidConfiguration
+
+from conans import ConanFile, CMake, tools, AutoToolsBuildEnvironment, RunEnvironment, python_requires
+from conans.errors import ConanInvalidConfiguration, ConanException
+from conans.tools import os_info
+import os, re, stat, fnmatch, platform, glob, traceback, shutil
+from functools import total_ordering
+
+# if you using python less than 3 use from distutils import strtobool
+from distutils.util import strtobool
+
+conan_build_helper = python_requires("conan_build_helper/[~=0.0]@conan/stable")
 
 @total_ordering
 class OpenSSLVersion(object):
@@ -59,7 +75,7 @@ class OpenSSLVersion(object):
             return 1
 
 # see https://github.com/conan-io/conan-center-index/blob/master/recipes/openssl/ALL/conanfile.py
-class OpenSSLConan(ConanFile):
+class OpenSSLConan(conan_build_helper.CMakePackage):
     name = "openssl"
     version = "OpenSSL_1_1_1-stable" # don't forget to change _full_version below
     settings = "os_build", "os", "compiler", "arch", "build_type"
@@ -72,7 +88,12 @@ class OpenSSLConan(ConanFile):
     license = "OpenSSL"
     topics = ("conan", "openssl", "ssl", "tls", "encryption", "security")
     description = "A toolkit for the Transport Layer Security (TLS) and Secure Sockets Layer (SSL) protocols"
-    options = {"no_threads": [True, False],
+    options = {
+              "enable_ubsan": [True, False],
+              "enable_asan": [True, False],
+              "enable_msan": [True, False],
+              "enable_tsan": [True, False],
+              "no_threads": [True, False],
                "no_zlib": [True, False],
                "shared": [True, False],
                "fPIC": [True, False],
@@ -105,6 +126,170 @@ class OpenSSLConan(ConanFile):
     _env_build = None
     _source_subfolder = "sources"
 
+    # sets cmake variables required to use clang 10 from conan
+    def _is_compile_with_llvm_tools_enabled(self):
+      return self._environ_option("COMPILE_WITH_LLVM_TOOLS", default = 'false')
+
+    # installs clang 10 from conan
+    def _is_llvm_tools_enabled(self):
+      return self._environ_option("ENABLE_LLVM_TOOLS", default = 'false')
+
+    def collect_cxx_flags(self):
+        collect_cxx_flags = ' '
+
+        if self.options.enable_ubsan:
+            collect_cxx_flags += '-fPIC'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-optimize-sibling-calls'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-omit-frame-pointer'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-stack-protector'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-wrapv'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize=undefined'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize=float-divide-by-zero'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize=unsigned-integer-overflow'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize=implicit-conversion'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize=nullability-arg'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize=nullability-assign'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize=nullability-return'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-sanitize=vptr'
+            collect_cxx_flags += ' '
+
+        if self.options.enable_asan:
+            collect_cxx_flags += '-fPIC'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-optimize-sibling-calls'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-omit-frame-pointer'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-stack-protector'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize-address-use-after-scope'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize=address'
+            collect_cxx_flags += ' '
+
+        if self.options.enable_tsan:
+            collect_cxx_flags += '-fPIC'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-optimize-sibling-calls'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-omit-frame-pointer'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-stack-protector'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize=thread'
+            collect_cxx_flags += ' '
+
+        if self.options.enable_msan:
+            collect_cxx_flags += '-fPIC'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fPIE'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-elide-constructors'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-optimize-sibling-calls'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-omit-frame-pointer'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fno-stack-protector'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize-memory-track-origins=2'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize-memory-use-after-dtor'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fsanitize=memory'
+            collect_cxx_flags += ' '
+
+        if self.options.enable_msan \
+           or self.options.enable_asan \
+           or self.options.enable_tsan \
+           or self.options.enable_ubsan \
+           or self._is_compile_with_llvm_tools_enabled():
+            llvm_tools_ROOT = self.deps_cpp_info["llvm_tools"].rootpath.replace('\\', '/')
+            self.output.info('llvm_tools_ROOT = %s' % (llvm_tools_ROOT))
+            collect_cxx_flags += '-Wno-error=unused-command-line-argument'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-Wno-unused-command-line-argument'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-fuse-ld=lld'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-D__CLANG__'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-nostdinc++'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += '-stdlib=libc++'
+            collect_cxx_flags += ' '
+            collect_cxx_flags += "-isystem {}/include/c++/v1".format(llvm_tools_ROOT)
+            collect_cxx_flags += ' '
+            collect_cxx_flags += "-isystem {}/include".format(llvm_tools_ROOT)
+            collect_cxx_flags += ' '
+            collect_cxx_flags += "-isystem {}/lib/clang/10.0.1/include".format(llvm_tools_ROOT)
+            collect_cxx_flags += ' '
+            collect_cxx_flags += "-lc++"
+            collect_cxx_flags += ' '
+            collect_cxx_flags += "-lc++abi"
+            collect_cxx_flags += ' '
+            collect_cxx_flags += "-lunwind"
+            collect_cxx_flags += ' '
+            collect_cxx_flags += "-Wl,-rpath,{}/lib".format(llvm_tools_ROOT)
+            collect_cxx_flags += ' '
+            collect_cxx_flags += "-L{}/lib".format(llvm_tools_ROOT)
+            collect_cxx_flags += ' '
+
+        return collect_cxx_flags
+
+    def collect_linkflags(self):
+        collect_linkflags = ' '
+
+        if self.options.enable_ubsan:
+            collect_linkflags += '-static-libubsan'
+            collect_linkflags += ' '
+
+        if self.options.enable_asan:
+            collect_linkflags += '-static-libasan'
+            collect_linkflags += ' '
+
+        if self.options.enable_tsan:
+            collect_linkflags += '-static-libtsan'
+            collect_linkflags += ' '
+
+        if self.options.enable_msan:
+            collect_linkflags += '-static-libmsan'
+            collect_linkflags += ' '
+
+        if self.options.enable_msan \
+           or self.options.enable_asan \
+           or self.options.enable_tsan \
+           or self.options.enable_ubsan \
+           or self._is_compile_with_llvm_tools_enabled():
+            llvm_tools_ROOT = self.deps_cpp_info["llvm_tools"].rootpath.replace('\\', '/')
+            self.output.info('llvm_tools_ROOT = %s' % (llvm_tools_ROOT))
+            collect_linkflags += '-stdlib=libc++'
+            collect_linkflags += ' '
+            collect_linkflags += '-lc++'
+            collect_linkflags += ' '
+            collect_linkflags += '-lc++abi'
+            collect_linkflags += ' '
+            collect_linkflags += '-lunwind'
+            collect_linkflags += ' '
+            collect_linkflags += "-Wl,-rpath,{}/lib".format(llvm_tools_ROOT)
+            collect_linkflags += ' '
+            collect_linkflags += "-L{}/lib".format(llvm_tools_ROOT)
+            collect_linkflags += ' '
+
+        return collect_linkflags
+
     def build_requirements(self):
         # useful for example for conditional build_requires
         if tools.os_info.is_windows:
@@ -115,6 +300,10 @@ class OpenSSLConan(ConanFile):
         if self._win_bash:
             if "CONAN_BASH_PATH" not in os.environ and os_info.detect_windows_subsystem() != 'msys2':
                 self.build_requires("msys2/20190524")
+
+        # provides clang-tidy, clang-format, IWYU, scan-build, etc.
+        if self._is_llvm_tools_enabled():
+          self.build_requires("llvm_tools/master@conan/stable")
 
     @property
     def _is_msvc(self):
@@ -152,8 +341,23 @@ class OpenSSLConan(ConanFile):
 
 
     def configure(self):
-        del self.settings.compiler.libcxx
-        del self.settings.compiler.cppstd
+        lower_build_type = str(self.settings.build_type).lower()
+
+        if lower_build_type != "release" and not self._is_llvm_tools_enabled():
+            self.output.warn('enable llvm_tools for Debug builds')
+
+        if self._is_compile_with_llvm_tools_enabled() and not self._is_llvm_tools_enabled():
+            raise ConanInvalidConfiguration("llvm_tools must be enabled")
+
+        if self.options.enable_ubsan \
+           or self.options.enable_asan \
+           or self.options.enable_msan \
+           or self.options.enable_tsan:
+            if not self._is_llvm_tools_enabled():
+                raise ConanInvalidConfiguration("sanitizers require llvm_tools")
+
+        #del self.settings.compiler.libcxx
+        #del self.settings.compiler.cppstd
 
     def config_options(self):
         if self.settings.os != "Windows":
@@ -425,6 +629,12 @@ class OpenSSLConan(ConanFile):
         cxxflags = cflags[:]
         cxxflags.extend(env_build.cxx_flags)
 
+        collected_linkflags = self.collect_linkflags()
+        self.output.info('collected_linkflags = %s' % (collected_linkflags))
+
+        collected_cxx_flags = self.collect_cxx_flags()
+        self.output.info('collected_cxx_flags = %s' % (collected_cxx_flags))
+
         cc = self._tool("CC", "cc")
         cxx = self._tool("CXX", "cxx")
         ar = self._tool("AR", "ar")
@@ -448,11 +658,11 @@ class OpenSSLConan(ConanFile):
                                         cxx=cxx,
                                         ar=ar,
                                         ranlib=ranlib,
-                                        cflags=" ".join(cflags),
-                                        cxxflags=" ".join(cxxflags),
+                                        cflags=" ".join(cflags) + collected_cxx_flags,
+                                        cxxflags=" ".join(cxxflags) + collected_cxx_flags,
                                         defines=defines,
                                         includes=includes,
-                                        lflags=" ".join(env_build.link_flags))
+                                        lflags=" ".join(env_build.link_flags) + collected_linkflags)
         self.output.info("using target: %s -> %s" % (self._target, self._ancestor_target))
         self.output.info(config)
 
