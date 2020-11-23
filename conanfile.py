@@ -123,6 +123,17 @@ class OpenSSLConan(conan_build_helper.CMakePackage):
     default_options["no_zlib"] = True
     default_options["shared"] = True
     default_options["openssldir"] = None
+
+    ignore_compile_options = [\
+      "fPIC"\
+      , "openssldir"\
+      , "capieng_dialog"\
+      , "enable_ubsan"\
+      , "enable_asan"\
+      , "enable_msan"\
+      , "enable_tsan"\
+    ]
+
     _env_build = None
     _source_subfolder = "sources"
 
@@ -602,7 +613,7 @@ class OpenSSLConan(conan_build_helper.CMakePackage):
 
         for option_name in self.options.values.fields:
             activated = getattr(self.options, option_name)
-            if activated and option_name not in ["fPIC", "openssldir", "capieng_dialog"]:
+            if activated and option_name not in self.ignore_compile_options:
                 self.output.info("activated option: %s" % option_name)
                 args.append(option_name.replace("_", "-"))
         return args
