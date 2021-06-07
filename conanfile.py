@@ -74,10 +74,23 @@ class OpenSSLVersion(object):
         else:
             return 1
 
+# Users locally they get the 1.0.0 version,
+# without defining any env-var at all,
+# and CI servers will append the build number.
+# USAGE
+# version = get_version("1.0.0")
+# BUILD_NUMBER=-pre1+build2 conan export-pkg . my_channel/release
+def get_version(version):
+    bn = os.getenv("BUILD_NUMBER")
+    return (version + bn) if bn else version
+
 # see https://github.com/conan-io/conan-center-index/blob/master/recipes/openssl/ALL/conanfile.py
 class OpenSSLConan(conan_build_helper.CMakePackage):
     name = "openssl"
-    version = "OpenSSL_1_1_1-stable" # don't forget to change _full_version below
+
+    # don't forget to change _full_version below
+    version = get_version("OpenSSL_1_1_1-stable")
+
     settings = "os_build", "os", "compiler", "arch", "build_type"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://github.com/openssl/openssl"
