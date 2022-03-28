@@ -25,7 +25,6 @@ export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
 
 export PKG_NAME=openssl/OpenSSL_1_1_1-stable@conan/stable
 (CONAN_REVISIONS_ENABLED=1 \
@@ -57,34 +56,28 @@ export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
 
 # must exist
 file $(dirname $CXX)/../lib/clang/10.0.1/lib/linux/libclang_rt.tsan_cxx-x86_64.a
 
 # NOTE: NO `--profile` argument cause we use `CXX` env. var
 # NOTE: change `build_type=Debug` to `build_type=Release` in production
-CONAN_REVISIONS_ENABLED=1 \
-    CONAN_VERBOSE_TRACEBACK=1 \
-    CONAN_PRINT_RUN_COMMANDS=1 \
-    CONAN_LOGGING_LEVEL=10 \
-    GIT_SSL_NO_VERIFY=true \
-    conan create . \
-        conan/stable \
-        -s build_type=Debug \
-        -s llvm_tools:build_type=Release \
-        -o llvm_tools:enable_tsan=True \
-        -o llvm_tools:include_what_you_use=False \
-        -s llvm_tools:compiler=clang \
-        -s llvm_tools:compiler.version=10 \
-        -s llvm_tools:compiler.libcxx=libstdc++11 \
-        -o openssl:enable_tsan=True \
-        -e openssl:enable_llvm_tools=True \
-        -e openssl:compile_with_llvm_tools=True \
-        -s compiler=clang \
-        -s compiler.version=10 \
-        -s compiler.libcxx=libc++ \
-        -o openssl:shared=True
+conan create . \
+    conan/stable \
+    -s build_type=Debug \
+    -s llvm_tools:build_type=Release \
+    -o llvm_tools:enable_tsan=True \
+    -o llvm_tools:include_what_you_use=False \
+    -s llvm_tools:compiler=clang \
+    -s llvm_tools:compiler.version=10 \
+    -s llvm_tools:compiler.libcxx=libstdc++11 \
+    -o openssl:enable_tsan=True \
+    -e openssl:enable_llvm_tools=True \
+    -e openssl:compile_with_llvm_tools=True \
+    -s compiler=clang \
+    -s compiler.version=10 \
+    -s compiler.libcxx=libc++ \
+    -o openssl:shared=True
 
 # reset changed LDFLAGS
 unset LDFLAGS
@@ -109,7 +102,6 @@ export CONAN_REVISIONS_ENABLED=1
 export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
-export GIT_SSL_NO_VERIFY=true
 
 # NOTE: about `--keep-source` see https://bincrafters.github.io/2018/02/27/Updated-Conan-Package-Flow-1.1/
 conan create . conan/stable -s build_type=Debug --profile gcc --build missing --keep-source

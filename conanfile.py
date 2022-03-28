@@ -91,7 +91,7 @@ class OpenSSLConan(conan_build_helper.CMakePackage):
     # don't forget to change _full_version below
     version = get_version("OpenSSL_1_1_1-stable")
 
-    settings = "os_build", "os", "compiler", "arch", "build_type"
+    settings = "os", "compiler", "arch", "build_type"
     url = "https://github.com/conan-io/conan-center-index"
     homepage = "https://github.com/openssl/openssl"
     #repo_url = 'git@github.com:openssl/openssl.git'
