@@ -5,9 +5,9 @@
 ```bash
 export MY_IP=$(ip route get 8.8.8.8 | sed -n '/src/{s/.*src *\([^ ]*\).*/\1/p;q}')
 sudo -E docker build \
-    --build-arg PKG_NAME=openssl/OpenSSL_1_1_1-stable \
+    --build-arg PKG_NAME=openssl/1.1.1-stable \
     --build-arg PKG_CHANNEL=conan/stable \
-    --build-arg PKG_UPLOAD_NAME=openssl/OpenSSL_1_1_1-stable@conan/stable \
+    --build-arg PKG_UPLOAD_NAME=openssl/1.1.1-stable@conan/stable \
     --build-arg CONAN_EXTRA_REPOS="conan-local http://$MY_IP:8081/artifactory/api/conan/conan False" \
     --build-arg CONAN_EXTRA_REPOS_USER="user -p password1 -r conan-local admin" \
     --build-arg CONAN_INSTALL="conan install --profile gcc --build missing" \
@@ -26,7 +26,7 @@ export CONAN_VERBOSE_TRACEBACK=1
 export CONAN_PRINT_RUN_COMMANDS=1
 export CONAN_LOGGING_LEVEL=10
 
-export PKG_NAME=openssl/OpenSSL_1_1_1-stable@conan/stable
+export PKG_NAME=openssl/1.1.1-stable@conan/stable
 (CONAN_REVISIONS_ENABLED=1 \
     conan remove --force $PKG_NAME || true)
 conan create . conan/stable -s build_type=Debug --profile gcc --build missing -o openssl:shared=True
